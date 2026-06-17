@@ -1,9 +1,9 @@
-import { Clock, Layers, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Clock, Layers, AlertTriangle, CheckCircle, TrendingUp, Target } from 'lucide-react';
 import { useSliceStore } from '../store/useSliceStore';
 import { formatDuration } from '../utils/timeUtils';
 
 export const StatsBar = () => {
-  const { slices, getTotalDuration, qualityIssues } = useSliceStore();
+  const { slices, getTotalDuration, qualityIssues, getReviewSummary, getPriorityOptimizationSlices } = useSliceStore();
 
   const totalSlices = slices.filter((s) => !s.isBackup).length;
   const backupSlices = slices.filter((s) => s.isBackup).length;
@@ -13,9 +13,12 @@ export const StatsBar = () => {
   const warningCount = qualityIssues.filter((i) => i.severity === 'warning').length;
   const progressPercent = totalSlices > 0 ? Math.round((familiarCount / totalSlices) * 100) : 0;
 
+  const reviewSummary = getReviewSummary();
+  const prioritySlices = getPriorityOptimizationSlices();
+
   return (
     <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-xl p-6 text-white shadow-lg">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-4">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-indigo-500/20 rounded-lg">
             <Layers className="w-6 h-6 text-indigo-400" />
@@ -26,7 +29,7 @@ export const StatsBar = () => {
               {totalSlices}
               {backupSlices > 0 && (
                 <span className="text-sm font-normal text-slate-400 ml-1">
-                  (+{backupSlices}备用)
+                  (+{backupSlices})
                 </span>
               )}
             </p>
@@ -63,9 +66,31 @@ export const StatsBar = () => {
           <div>
             <p className="text-xs text-slate-400">质量问题</p>
             <p className="text-xl font-bold">
-              {errorCount > 0 && <span className="text-red-400">{errorCount}错误 </span>}
-              {warningCount > 0 && <span className="text-amber-400">{warningCount}警告</span>}
-              {errorCount === 0 && warningCount === 0 && <span className="text-emerald-400">无问题</span>}
+              {errorCount > 0 && <span className="text-red-400">{errorCount}错 </span>}
+              {warningCount > 0 && <span className="text-amber-400">{warningCount}警</span>}
+              {errorCount === 0 && warningCount === 0 && <span className="text-emerald-400">无</span>}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-purple-500/20 rounded-lg">
+            <TrendingUp className="w-6 h-6 text-purple-400" />
+          </div>
+          <div>
+            <p className="text-xs text-slate-400">复盘次数</p>
+            <p className="text-xl font-bold text-purple-300">{reviewSummary.totalReviews}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-lg ${prioritySlices.length > 0 ? 'bg-orange-500/20' : 'bg-emerald-500/20'}`}>
+            <Target className={`w-6 h-6 ${prioritySlices.length > 0 ? 'text-orange-400' : 'text-emerald-400'}`} />
+          </div>
+          <div>
+            <p className="text-xs text-slate-400">待优化</p>
+            <p className={`text-xl font-bold ${prioritySlices.length > 0 ? 'text-orange-300' : 'text-emerald-300'}`}>
+              {prioritySlices.length}
             </p>
           </div>
         </div>
@@ -73,7 +98,7 @@ export const StatsBar = () => {
 
       <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
         <div
-          className="h-full bg-gradient-to-r from-emerald-500 to-indigo-500 transition-all duration-500"
+          className="h-full bg-gradient-to-r from-emerald-500 via-indigo-500 to-purple-500 transition-all duration-500"
           style={{ width: `${progressPercent}%` }}
         />
       </div>

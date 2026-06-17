@@ -7,12 +7,14 @@ import {
   AlertTriangle,
   MessageSquare,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  Zap
 } from 'lucide-react';
 import { useSliceStore } from '../store/useSliceStore';
 import { RehearsalTimer } from './RehearsalTimer';
 import { formatDuration } from '../utils/timeUtils';
 import { ExhibitionSlice } from '../types';
+import { ReviewReminder } from './ReviewReminder';
 
 export const RehearsalMode = () => {
   const {
@@ -32,6 +34,8 @@ export const RehearsalMode = () => {
 
   const currentSlice = activeSlices[currentRehearsalIndex];
   const nextSlice = activeSlices[currentRehearsalIndex + 1];
+
+  const attentionSlices = activeSlices.filter((s) => s.reviewFlags.length > 0);
 
   const totalDuration = getTotalDuration();
   const elapsedDuration = activeSlices
@@ -93,6 +97,12 @@ export const RehearsalMode = () => {
           </span>
         </div>
         <div className="flex items-center gap-4 text-slate-300 text-sm">
+          {attentionSlices.length > 0 && (
+            <span className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 text-amber-300 rounded-full border border-amber-500/30">
+              <Zap className="w-4 h-4" />
+              {attentionSlices.length} 个切片需重点关注
+            </span>
+          )}
           <span className="flex items-center gap-1">
             <Clock className="w-4 h-4" />
             剩余: {formatDuration(remainingDuration)}
@@ -122,6 +132,8 @@ export const RehearsalMode = () => {
               onTimeUp={handleTimeUp}
             />
           </div>
+
+          <ReviewReminder slice={currentSlice} />
 
           <div className="bg-slate-800 rounded-2xl p-8 mb-6 animate-slide-up">
             <div className="flex items-start justify-between mb-4">

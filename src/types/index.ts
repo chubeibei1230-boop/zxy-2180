@@ -1,4 +1,36 @@
 export type RehearsalStatus = 'pending' | 'familiar' | 'needShorten' | 'skipped';
+export type SelfRating = 1 | 2 | 3 | 4 | 5;
+export type ReviewFlagType = 'timeout' | 'stuck' | 'lowRating';
+
+export interface SliceReview {
+  sliceId: string;
+  actualDurationMinutes: number;
+  isStuck: boolean;
+  stuckDescription: string;
+  liveNotes: string;
+  selfRating: SelfRating;
+  improvementSuggestion: string;
+}
+
+export interface RehearsalReviewRecord {
+  id: string;
+  sessionStartTime: string;
+  sessionEndTime: string;
+  totalActualDurationMinutes: number;
+  overallNotes: string;
+  sliceReviews: SliceReview[];
+  createdAt: string;
+}
+
+export interface ReviewSummary {
+  totalReviews: number;
+  lastReviewDate: string | null;
+  averageRating: number;
+  timeoutSlices: string[];
+  stuckSlices: string[];
+  lowRatingSlices: string[];
+  recentReviews: RehearsalReviewRecord[];
+}
 
 export interface ExhibitionSlice {
   id: string;
@@ -14,6 +46,9 @@ export interface ExhibitionSlice {
   parentId?: string;
   createdAt: string;
   updatedAt: string;
+  lastReview?: SliceReview | null;
+  reviewCount: number;
+  reviewFlags: ReviewFlagType[];
 }
 
 export interface Filters {
@@ -44,10 +79,14 @@ export interface AppState {
   isRehearsalMode: boolean;
   currentRehearsalIndex: number;
   editingSliceId: string | null | undefined;
+  reviewRecords: RehearsalReviewRecord[];
+  showReviewForm: boolean;
+  showReviewPanel: boolean;
+  sessionStartTime: string | null;
 }
 
 export interface AppActions {
-  addSlice: (slice: Omit<ExhibitionSlice, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  addSlice: (slice: Omit<ExhibitionSlice, 'id' | 'createdAt' | 'updatedAt' | 'reviewCount' | 'reviewFlags'>) => void;
   updateSlice: (id: string, updates: Partial<ExhibitionSlice>) => void;
   deleteSlice: (id: string) => void;
   duplicateSlice: (id: string) => void;
@@ -65,4 +104,11 @@ export interface AppActions {
   getTotalDuration: () => number;
   getFilteredSlices: () => ExhibitionSlice[];
   getExhibitList: () => string[];
+  saveRehearsalReview: (record: Omit<RehearsalReviewRecord, 'id' | 'createdAt'>) => void;
+  getReviewSummary: () => ReviewSummary;
+  getSliceLatestReview: (sliceId: string) => SliceReview | undefined;
+  getPriorityOptimizationSlices: () => ExhibitionSlice[];
+  setShowReviewForm: (show: boolean) => void;
+  setShowReviewPanel: (show: boolean) => void;
+  setSessionStartTime: (time: string | null) => void;
 }

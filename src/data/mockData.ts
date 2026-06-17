@@ -16,7 +16,10 @@ export const mockSlices: ExhibitionSlice[] = [
     orderIndex: 0,
     isBackup: false,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    reviewCount: 0,
+    reviewFlags: [],
+    lastReview: null
   },
   {
     id: generateId(),
@@ -30,7 +33,10 @@ export const mockSlices: ExhibitionSlice[] = [
     orderIndex: 1,
     isBackup: false,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    reviewCount: 0,
+    reviewFlags: [],
+    lastReview: null
   },
   {
     id: generateId(),
@@ -44,7 +50,10 @@ export const mockSlices: ExhibitionSlice[] = [
     orderIndex: 2,
     isBackup: false,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    reviewCount: 0,
+    reviewFlags: [],
+    lastReview: null
   },
   {
     id: generateId(),
@@ -58,7 +67,10 @@ export const mockSlices: ExhibitionSlice[] = [
     orderIndex: 3,
     isBackup: false,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    reviewCount: 0,
+    reviewFlags: [],
+    lastReview: null
   },
   {
     id: generateId(),
@@ -72,7 +84,10 @@ export const mockSlices: ExhibitionSlice[] = [
     orderIndex: 4,
     isBackup: false,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    reviewCount: 0,
+    reviewFlags: [],
+    lastReview: null
   },
   {
     id: generateId(),
@@ -86,7 +101,10 @@ export const mockSlices: ExhibitionSlice[] = [
     orderIndex: 5,
     isBackup: false,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    reviewCount: 0,
+    reviewFlags: [],
+    lastReview: null
   },
   {
     id: generateId(),
@@ -101,6 +119,9 @@ export const mockSlices: ExhibitionSlice[] = [
     isBackup: true,
     parentId: 'placeholder',
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    reviewCount: 0,
+    reviewFlags: [],
+    lastReview: null
   }
 ];

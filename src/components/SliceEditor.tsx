@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
-import { ExhibitionSlice, RehearsalStatus } from '../types';
+import { RehearsalStatus } from '../types';
 import { useSliceStore } from '../store/useSliceStore';
 
 interface SliceEditorProps {

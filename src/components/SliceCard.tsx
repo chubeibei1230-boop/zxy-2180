@@ -12,10 +12,32 @@ import {
   CheckCircle2,
   PauseCircle,
   Scissors,
-  SkipForward
+  SkipForward,
+  Star
 } from 'lucide-react';
-import { ExhibitionSlice, RehearsalStatus } from '../types';
+import { ExhibitionSlice, RehearsalStatus, ReviewFlagType } from '../types';
 import { useSliceStore } from '../store/useSliceStore';
+
+const flagConfig: Record<ReviewFlagType, { label: string; color: string; bgColor: string; icon: React.ElementType }> = {
+  timeout: {
+    label: '超时',
+    color: 'text-red-700',
+    bgColor: 'bg-red-50 border-red-200',
+    icon: Clock
+  },
+  stuck: {
+    label: '卡顿',
+    color: 'text-amber-700',
+    bgColor: 'bg-amber-50 border-amber-200',
+    icon: AlertTriangle
+  },
+  lowRating: {
+    label: '低分',
+    color: 'text-purple-700',
+    bgColor: 'bg-purple-50 border-purple-200',
+    icon: Star
+  }
+};
 
 interface SliceCardProps {
   slice: ExhibitionSlice;
@@ -142,6 +164,24 @@ export const SliceCard = ({ slice }: SliceCardProps) => {
                 <span className="inline-flex items-center gap-1 px-2 py-1 text-xs text-red-700 bg-red-50 rounded">
                   <MessageSquare className="w-3 h-3" />
                   缺少备用说法
+                </span>
+              )}
+              {slice.reviewFlags.map((flag) => {
+                const cfg = flagConfig[flag];
+                const FlagIcon = cfg.icon;
+                return (
+                  <span
+                    key={flag}
+                    className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded border ${cfg.bgColor} ${cfg.color}`}
+                  >
+                    <FlagIcon className="w-3 h-3" />
+                    {cfg.label}
+                  </span>
+                );
+              })}
+              {slice.reviewCount > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 text-xs text-slate-600 bg-slate-100 rounded">
+                  复盘 {slice.reviewCount} 次
                 </span>
               )}
             </div>
