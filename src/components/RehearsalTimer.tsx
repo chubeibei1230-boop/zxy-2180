@@ -25,12 +25,14 @@ export const RehearsalTimer = forwardRef<RehearsalTimerRef, RehearsalTimerProps>
   const [remainingSeconds, setRemainingSeconds] = useState(totalSeconds - initialElapsedSeconds);
   const [isRunning, setIsRunning] = useState(autoStart);
   const intervalRef = useRef<number | null>(null);
+  const timeUpNotifiedRef = useRef(false);
 
   useImperativeHandle(ref, () => ({
     getElapsedSeconds: () => totalSeconds - remainingSeconds,
     reset: () => {
       setRemainingSeconds(totalSeconds);
       setIsRunning(false);
+      timeUpNotifiedRef.current = false;
     },
     start: () => setIsRunning(true),
     pause: () => setIsRunning(false)
@@ -38,6 +40,7 @@ export const RehearsalTimer = forwardRef<RehearsalTimerRef, RehearsalTimerProps>
 
   useEffect(() => {
     setRemainingSeconds(totalSeconds - initialElapsedSeconds);
+    timeUpNotifiedRef.current = initialElapsedSeconds >= totalSeconds;
     if (autoStart) {
       setIsRunning(true);
     }
@@ -50,10 +53,9 @@ export const RehearsalTimer = forwardRef<RehearsalTimerRef, RehearsalTimerProps>
           const next = prev - 1;
           const elapsed = totalSeconds - next;
           onTick?.(elapsed);
-          if (next <= 0) {
-            setIsRunning(false);
+          if (next <= 0 && !timeUpNotifiedRef.current) {
+            timeUpNotifiedRef.current = true;
             onTimeUp?.();
-            return 0;
           }
           return next;
         });
@@ -76,6 +78,7 @@ export const RehearsalTimer = forwardRef<RehearsalTimerRef, RehearsalTimerProps>
   const resetTimer = () => {
     setIsRunning(false);
     setRemainingSeconds(totalSeconds);
+    timeUpNotifiedRef.current = false;
     onTick?.(0);
   };
 
@@ -83,6 +86,10 @@ export const RehearsalTimer = forwardRef<RehearsalTimerRef, RehearsalTimerProps>
   const progressPercent = (elapsedSeconds / totalSeconds) * 100;
   const isWarning = remainingSeconds <= 60 && remainingSeconds > 30;
   const isDanger = remainingSeconds <= 30;
+  const isOvertime = remainingSeconds < 0;
+  const displayTime = isOvertime
+    ? `+${formatTimeDisplay(Math.abs(remainingSeconds))}`
+    : formatTimeDisplay(remainingSeconds);
 
   return (
     <div className="flex flex-col items-center">
@@ -91,7 +98,7 @@ export const RehearsalTimer = forwardRef<RehearsalTimerRef, RehearsalTimerProps>
           isDanger ? 'text-red-500 animate-pulse' : isWarning ? 'text-amber-500' : 'text-white'
         }`}
       >
-        {formatTimeDisplay(remainingSeconds)}
+        {displayTime}
       </div>
 
       <div className="w-64 h-2 bg-slate-700 rounded-full overflow-hidden mb-4">
