@@ -39,10 +39,11 @@ interface ReviewPanelProps {
 }
 
 export const ReviewPanel = ({ onClose, onJumpToSlice }: ReviewPanelProps) => {
-  const { getReviewSummary, getPriorityOptimizationSlices, slices } = useSliceStore();
+  const { getReviewSummary, getPriorityOptimizationSlices, slices, getAllReviewRecords } = useSliceStore();
 
   const summary = getReviewSummary();
   const prioritySlices = getPriorityOptimizationSlices();
+  const allRecords = getAllReviewRecords();
   const [selectedTab, setSelectedTab] = useState<'summary' | 'priority' | 'history'>('summary');
 
   const allSlicesMap = useMemo(() => {
@@ -301,8 +302,8 @@ export const ReviewPanel = ({ onClose, onJumpToSlice }: ReviewPanelProps) => {
 
           {selectedTab === 'history' && (
             <div className="space-y-4">
-              {summary.recentReviews.length > 0 ? (
-                summary.recentReviews.map((record, recordIndex) => {
+              {allRecords.length > 0 ? (
+                allRecords.map((record, recordIndex) => {
                   const avgRating = record.sliceReviews.length > 0
                     ? record.sliceReviews.reduce((sum, r) => sum + r.selfRating, 0) / record.sliceReviews.length
                     : 0;
@@ -311,6 +312,9 @@ export const ReviewPanel = ({ onClose, onJumpToSlice }: ReviewPanelProps) => {
                     return slice && r.actualDurationMinutes > slice.durationMinutes;
                   }).length;
                   const stuckCount = record.sliceReviews.filter((r) => r.isStuck).length;
+                  const rehearsedCount = record.sliceReviews.filter(
+                    (r) => r.rehearsalStatus === 'rehearsed'
+                  ).length;
 
                   return (
                     <div
@@ -320,11 +324,11 @@ export const ReviewPanel = ({ onClose, onJumpToSlice }: ReviewPanelProps) => {
                       <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-gradient-to-br from-indigo-400 to-purple-400 rounded-lg flex items-center justify-center text-white font-bold">
-                            #{summary.recentReviews.length - recordIndex}
+                            #{allRecords.length - recordIndex}
                           </div>
                           <div>
                             <h4 className="font-semibold text-slate-800">
-                              第 {summary.recentReviews.length - recordIndex} 次排练
+                              第 {allRecords.length - recordIndex} 次排练
                             </h4>
                             <p className="text-xs text-slate-500">
                               {formatDate(record.sessionStartTime)} - {formatDate(record.sessionEndTime)}
@@ -345,9 +349,13 @@ export const ReviewPanel = ({ onClose, onJumpToSlice }: ReviewPanelProps) => {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-4 px-4 py-3 border-b border-slate-100 text-center text-sm">
+                      <div className="grid grid-cols-4 gap-4 px-4 py-3 border-b border-slate-100 text-center text-sm">
                         <div>
-                          <span className="text-slate-400">切片数: </span>
+                          <span className="text-slate-400">已排练: </span>
+                          <span className="font-semibold text-slate-700">{rehearsedCount}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">总数: </span>
                           <span className="font-semibold text-slate-700">{record.sliceReviews.length}</span>
                         </div>
                         <div>
@@ -376,18 +384,28 @@ export const ReviewPanel = ({ onClose, onJumpToSlice }: ReviewPanelProps) => {
                           return (
                             <div key={review.sliceId} className="px-4 py-2 flex items-center gap-3">
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-slate-700 truncate">{slice.title}</p>
+                                <p className="text-sm font-medium text-slate-700 truncate">
+                                  {slice.title}
+                                </p>
                                 <p className="text-xs text-slate-400">
-                                  {formatDuration(review.actualDurationMinutes)}
-                                  {hasTimeout && (
-                                    <span className="text-red-500 ml-1">
-                                      (+{(review.actualDurationMinutes - slice.durationMinutes).toFixed(1)}分)
-                                    </span>
+                                  {review.rehearsalStatus === 'rehearsed' ? (
+                                    <>
+                                      {formatDuration(review.actualDurationMinutes)}
+                                      {hasTimeout && (
+                                        <span className="text-red-500 ml-1">
+                                          (+{(review.actualDurationMinutes - slice.durationMinutes).toFixed(1)}分)
+                                        </span>
+                                      )}
+                                      {review.isStuck && <span className="text-amber-500 ml-2">· 卡顿</span>}
+                                    </>
+                                  ) : (
+                                    <span className="text-slate-400">未排练</span>
                                   )}
-                                  {review.isStuck && <span className="text-amber-500 ml-2">· 卡顿</span>}
                                 </p>
                               </div>
-                              <RatingDisplay rating={review.selfRating} />
+                              {review.rehearsalStatus === 'rehearsed' && (
+                                <RatingDisplay rating={review.selfRating} />
+                              )}
                             </div>
                           );
                         })}

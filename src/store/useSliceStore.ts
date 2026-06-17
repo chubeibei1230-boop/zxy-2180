@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { AppState, AppActions, ExhibitionSlice, Filters, RehearsalReviewRecord, ReviewFlagType } from '../types';
+import type {
+  AppState,
+  AppActions,
+  ExhibitionSlice,
+  Filters,
+  RehearsalReviewRecord,
+  ReviewFlagType
+} from '../types';
 import { generateId } from '../utils/timeUtils';
 import { runAllChecks } from '../utils/qualityChecker';
 import { exportToMarkdown, downloadFile } from '../utils/exportUtils';
@@ -26,7 +33,9 @@ const initialState: AppState = {
   reviewRecords: [],
   showReviewForm: false,
   showReviewPanel: false,
-  sessionStartTime: null
+  sessionStartTime: null,
+  reviewDraft: null,
+  sliceRehearsalData: []
 };
 
 export const useSliceStore = create<AppState & AppActions>()(
@@ -160,12 +169,15 @@ export const useSliceStore = create<AppState & AppActions>()(
           if (activeSlices.length > 0) {
             set({ currentRehearsalIndex: 0 });
           }
-          set({ sessionStartTime: new Date().toISOString() });
-        } else {
-          const sessionStartTime = get().sessionStartTime;
-          if (sessionStartTime) {
-            set({ showReviewForm: true });
-          }
+          const startTime = new Date().toISOString();
+          set({
+            sessionStartTime: startTime,
+            sliceRehearsalData: activeSlices.map((s) => ({
+              sliceId: s.id,
+              elapsedSeconds: 0,
+              isCompleted: false
+            }))
+          });
         }
       },
 
@@ -224,6 +236,17 @@ export const useSliceStore = create<AppState & AppActions>()(
         return Array.from(exhibits);
       },
 
+      updateSliceElapsed: (sliceId, elapsedSeconds, isCompleted) => {
+        set((state) => {
+          const updatedData = state.sliceRehearsalData.map((d) =>
+            d.sliceId === sliceId
+              ? { ...d, elapsedSeconds, isCompleted }
+              : d
+          );
+          return { sliceRehearsalData: updatedData };
+        });
+      },
+
       saveRehearsalReview: (recordData) => {
         const now = new Date().toISOString();
         const newRecord: RehearsalReviewRecord = {
@@ -234,7 +257,9 @@ export const useSliceStore = create<AppState & AppActions>()(
 
         set((state) => {
           const updatedSlices = state.slices.map((slice) => {
-            const sliceReview = recordData.sliceReviews.find((r) => r.sliceId === slice.id);
+            const sliceReview = recordData.sliceReviews.find(
+              (r) => r.sliceId === slice.id && r.rehearsalStatus === 'rehearsed'
+            );
             if (!sliceReview) return slice;
 
             const newFlags: ReviewFlagType[] = [];
@@ -261,10 +286,36 @@ export const useSliceStore = create<AppState & AppActions>()(
             reviewRecords: [newRecord, ...state.reviewRecords],
             slices: updatedSlices,
             showReviewForm: false,
-            sessionStartTime: null
+            sessionStartTime: null,
+            reviewDraft: null,
+            sliceRehearsalData: []
           };
         });
         get().runQualityCheck();
+      },
+
+      saveReviewDraft: (draft) => {
+        set({
+          reviewDraft: draft,
+          showReviewForm: false
+        });
+      },
+
+      clearReviewDraft: () => {
+        set({
+          reviewDraft: null,
+          sessionStartTime: null,
+          sliceRehearsalData: []
+        });
+      },
+
+      continueFromDraft: () => {
+        const draft = get().reviewDraft;
+        if (draft) {
+          set({
+            showReviewForm: true
+          });
+        }
       },
 
       getReviewSummary: () => {
@@ -279,7 +330,11 @@ export const useSliceStore = create<AppState & AppActions>()(
           if (slice.reviewFlags.includes('lowRating')) lowRatingSlices.push(slice.id);
         });
 
-        const allRatings = reviewRecords.flatMap((r) => r.sliceReviews.map((s) => s.selfRating));
+        const allRatings = reviewRecords.flatMap((r) =>
+          r.sliceReviews
+            .filter((s) => s.rehearsalStatus === 'rehearsed')
+            .map((s) => s.selfRating)
+        );
         const averageRating = allRatings.length > 0
           ? allRatings.reduce((sum, r) => sum + r, 0) / allRatings.length
           : 0;
@@ -297,6 +352,13 @@ export const useSliceStore = create<AppState & AppActions>()(
           lowRatingSlices,
           recentReviews: sortedRecords.slice(0, 5)
         };
+      },
+
+      getAllReviewRecords: () => {
+        const { reviewRecords } = get();
+        return [...reviewRecords].sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
       },
 
       getSliceLatestReview: (sliceId) => {
@@ -332,7 +394,9 @@ export const useSliceStore = create<AppState & AppActions>()(
       partialize: (state) => ({
         slices: state.slices,
         filters: state.filters,
-        reviewRecords: state.reviewRecords
+        reviewRecords: state.reviewRecords,
+        reviewDraft: state.reviewDraft,
+        sliceRehearsalData: state.sliceRehearsalData
       })
     }
   )

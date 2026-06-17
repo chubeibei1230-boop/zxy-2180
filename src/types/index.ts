@@ -1,6 +1,7 @@
 export type RehearsalStatus = 'pending' | 'familiar' | 'needShorten' | 'skipped';
 export type SelfRating = 1 | 2 | 3 | 4 | 5;
 export type ReviewFlagType = 'timeout' | 'stuck' | 'lowRating';
+export type RehearsalStep = 'unrehearsed' | 'rehearsed' | 'skipped_during';
 
 export interface SliceReview {
   sliceId: string;
@@ -10,6 +11,7 @@ export interface SliceReview {
   liveNotes: string;
   selfRating: SelfRating;
   improvementSuggestion: string;
+  rehearsalStatus: RehearsalStep;
 }
 
 export interface RehearsalReviewRecord {
@@ -20,6 +22,21 @@ export interface RehearsalReviewRecord {
   overallNotes: string;
   sliceReviews: SliceReview[];
   createdAt: string;
+}
+
+export interface SliceRehearsalData {
+  sliceId: string;
+  elapsedSeconds: number;
+  isCompleted: boolean;
+}
+
+export interface ReviewDraft {
+  sessionStartTime: string;
+  sessionEndTime: string;
+  sliceData: SliceRehearsalData[];
+  overallNotes: string;
+  sliceReviews: Record<string, Partial<SliceReview>>;
+  lastEditedIndex: number;
 }
 
 export interface ReviewSummary {
@@ -83,6 +100,8 @@ export interface AppState {
   showReviewForm: boolean;
   showReviewPanel: boolean;
   sessionStartTime: string | null;
+  reviewDraft: ReviewDraft | null;
+  sliceRehearsalData: SliceRehearsalData[];
 }
 
 export interface AppActions {
@@ -111,4 +130,9 @@ export interface AppActions {
   setShowReviewForm: (show: boolean) => void;
   setShowReviewPanel: (show: boolean) => void;
   setSessionStartTime: (time: string | null) => void;
+  updateSliceElapsed: (sliceId: string, elapsedSeconds: number, isCompleted: boolean) => void;
+  saveReviewDraft: (draft: ReviewDraft) => void;
+  clearReviewDraft: () => void;
+  continueFromDraft: () => void;
+  getAllReviewRecords: () => RehearsalReviewRecord[];
 }

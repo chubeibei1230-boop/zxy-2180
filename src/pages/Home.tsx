@@ -13,7 +13,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy
 } from '@dnd-kit/sortable';
-import { Plus, Download, Play, Mic2, TrendingUp, Target, ChevronRight, Clock, AlertTriangle, Star, Zap } from 'lucide-react';
+import { Plus, Download, Play, Mic2, TrendingUp, Target, ChevronRight, Clock, AlertTriangle, Star, Zap, FileText } from 'lucide-react';
 import { useSliceStore } from '../store/useSliceStore';
 import { StatsBar } from '../components/StatsBar';
 import { FilterPanel } from '../components/FilterPanel';
@@ -47,7 +47,10 @@ export default function Home() {
     showReviewPanel,
     setShowReviewPanel,
     getReviewSummary,
-    getPriorityOptimizationSlices
+    getPriorityOptimizationSlices,
+    reviewDraft,
+    continueFromDraft,
+    clearReviewDraft
   } = useSliceStore();
 
   const filteredSlices = getFilteredSlices();
@@ -169,6 +172,46 @@ export default function Home() {
           </div>
         </div>
       </header>
+
+      {reviewDraft && (
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-200">
+          <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-1.5 bg-amber-500 rounded-lg">
+                <FileText className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-amber-900">
+                  有未完成的复盘记录
+                </p>
+                <p className="text-xs text-amber-700">
+                  {new Date(reviewDraft.sessionStartTime).toLocaleDateString('zh-CN', {
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })} 的排练复盘尚未完成
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => clearReviewDraft()}
+                className="px-3 py-1.5 text-amber-700 hover:bg-amber-200/50 rounded-lg text-sm font-medium transition-colors"
+              >
+                丢弃
+              </button>
+              <button
+                onClick={() => continueFromDraft()}
+                className="px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5"
+              >
+                <Play className="w-4 h-4" />
+                继续填写
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="max-w-7xl mx-auto px-4 py-6">
         <div className="mb-6">

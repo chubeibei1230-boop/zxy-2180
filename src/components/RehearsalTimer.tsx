@@ -1,33 +1,61 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { Play, Pause, RotateCcw } from 'lucide-react';
 import { formatTimeDisplay } from '../utils/timeUtils';
 
 interface RehearsalTimerProps {
   durationMinutes: number;
   onTimeUp?: () => void;
+  onTick?: (elapsedSeconds: number) => void;
+  initialElapsedSeconds?: number;
+  autoStart?: boolean;
 }
 
-export const RehearsalTimer = ({ durationMinutes, onTimeUp }: RehearsalTimerProps) => {
+export interface RehearsalTimerRef {
+  getElapsedSeconds: () => number;
+  reset: () => void;
+  start: () => void;
+  pause: () => void;
+}
+
+export const RehearsalTimer = forwardRef<RehearsalTimerRef, RehearsalTimerProps>((
+  { durationMinutes, onTimeUp, onTick, initialElapsedSeconds = 0, autoStart = false },
+  ref
+) => {
   const totalSeconds = durationMinutes * 60;
-  const [remainingSeconds, setRemainingSeconds] = useState(totalSeconds);
-  const [isRunning, setIsRunning] = useState(false);
+  const [remainingSeconds, setRemainingSeconds] = useState(totalSeconds - initialElapsedSeconds);
+  const [isRunning, setIsRunning] = useState(autoStart);
   const intervalRef = useRef<number | null>(null);
 
+  useImperativeHandle(ref, () => ({
+    getElapsedSeconds: () => totalSeconds - remainingSeconds,
+    reset: () => {
+      setRemainingSeconds(totalSeconds);
+      setIsRunning(false);
+    },
+    start: () => setIsRunning(true),
+    pause: () => setIsRunning(false)
+  }));
+
   useEffect(() => {
-    setRemainingSeconds(totalSeconds);
-    setIsRunning(false);
-  }, [totalSeconds]);
+    setRemainingSeconds(totalSeconds - initialElapsedSeconds);
+    if (autoStart) {
+      setIsRunning(true);
+    }
+  }, [totalSeconds, initialElapsedSeconds, autoStart]);
 
   useEffect(() => {
     if (isRunning) {
       intervalRef.current = window.setInterval(() => {
         setRemainingSeconds((prev) => {
-          if (prev <= 1) {
+          const next = prev - 1;
+          const elapsed = totalSeconds - next;
+          onTick?.(elapsed);
+          if (next <= 0) {
             setIsRunning(false);
             onTimeUp?.();
             return 0;
           }
-          return prev - 1;
+          return next;
         });
       }, 1000);
     } else if (intervalRef.current) {
@@ -39,7 +67,7 @@ export const RehearsalTimer = ({ durationMinutes, onTimeUp }: RehearsalTimerProp
         clearInterval(intervalRef.current);
       }
     };
-  }, [isRunning, onTimeUp]);
+  }, [isRunning, onTimeUp, onTick, totalSeconds]);
 
   const toggleTimer = () => {
     setIsRunning(!isRunning);
@@ -48,9 +76,11 @@ export const RehearsalTimer = ({ durationMinutes, onTimeUp }: RehearsalTimerProp
   const resetTimer = () => {
     setIsRunning(false);
     setRemainingSeconds(totalSeconds);
+    onTick?.(0);
   };
 
-  const progressPercent = ((totalSeconds - remainingSeconds) / totalSeconds) * 100;
+  const elapsedSeconds = totalSeconds - remainingSeconds;
+  const progressPercent = (elapsedSeconds / totalSeconds) * 100;
   const isWarning = remainingSeconds <= 60 && remainingSeconds > 30;
   const isDanger = remainingSeconds <= 30;
 
@@ -69,7 +99,7 @@ export const RehearsalTimer = ({ durationMinutes, onTimeUp }: RehearsalTimerProp
           className={`h-full transition-all duration-1000 ${
             isDanger ? 'bg-red-500' : isWarning ? 'bg-amber-500' : 'bg-emerald-500'
           }`}
-          style={{ width: `${progressPercent}%` }}
+          style={{ width: `${Math.min(progressPercent, 100)}%` }}
         />
       </div>
 
@@ -103,4 +133,6 @@ export const RehearsalTimer = ({ durationMinutes, onTimeUp }: RehearsalTimerProp
       </div>
     </div>
   );
-};
+});
+
+RehearsalTimer.displayName = 'RehearsalTimer';
