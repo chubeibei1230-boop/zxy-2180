@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -13,7 +13,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy
 } from '@dnd-kit/sortable';
-import { Plus, Download, Play, Mic2, TrendingUp, Target, ChevronRight, Clock, AlertTriangle, Star, Zap, FileText, Calendar } from 'lucide-react';
+import { Plus, Download, Play, Mic2, TrendingUp, Target, ChevronRight, ChevronDown, Clock, AlertTriangle, Star, Zap, FileText, Calendar } from 'lucide-react';
 import { useSliceStore } from '../store/useSliceStore';
 import { StatsBar } from '../components/StatsBar';
 import { FilterPanel } from '../components/FilterPanel';
@@ -24,6 +24,7 @@ import { QualityPanel } from '../components/QualityPanel';
 import { RehearsalMode } from '../components/RehearsalMode';
 import { ReviewForm } from '../components/ReviewForm';
 import { ReviewPanel } from '../components/ReviewPanel';
+import { ReviewReport } from '../components/ReviewReport';
 import { SessionPlanPanel } from '../components/SessionPlanPanel';
 import { ExhibitionSlice, ReviewFlagType } from '../types';
 
@@ -47,6 +48,8 @@ export default function Home() {
     showReviewForm,
     showReviewPanel,
     setShowReviewPanel,
+    showReviewReport,
+    setShowReviewReport,
     getReviewSummary,
     getPriorityOptimizationSlices,
     reviewDraft,
@@ -54,7 +57,8 @@ export default function Home() {
     clearReviewDraft,
     showSessionPlanPanel,
     setShowSessionPlanPanel,
-    sessionPlans
+    sessionPlans,
+    setViewingReviewRecordId
   } = useSliceStore();
 
   const filteredSlices = getFilteredSlices();
@@ -62,6 +66,7 @@ export default function Home() {
   const reviewSummary = getReviewSummary();
   const prioritySlices = getPriorityOptimizationSlices();
   const sliceCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [showReportMenu, setShowReportMenu] = useState(false);
 
   const formatDateShort = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -120,6 +125,20 @@ export default function Home() {
         <ReviewPanel
           onClose={() => setShowReviewPanel(false)}
           onJumpToSlice={handleJumpToSlice}
+          onViewReport={(recordId) => {
+            setViewingReviewRecordId(recordId);
+            setShowReviewPanel(false);
+            setShowReviewReport(true);
+          }}
+        />
+      )}
+      {showReviewReport && (
+        <ReviewReport
+          onClose={() => {
+            setShowReviewReport(false);
+            setViewingReviewRecordId(null);
+          }}
+          onJumpToSlice={handleJumpToSlice}
         />
       )}
       {showSessionPlanPanel && (
@@ -155,15 +174,42 @@ export default function Home() {
                 )}
               </button>
               <button
-                onClick={() => setShowReviewPanel(true)}
-                className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-400/30 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                onClick={() => setShowReportMenu(!showReportMenu)}
+                className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-400/30 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 relative"
               >
                 <TrendingUp className="w-4 h-4" />
-                复盘中心
+                复盘
                 {prioritySlices.length > 0 && (
                   <span className="px-1.5 py-0.5 bg-orange-500 text-xs rounded-full font-bold">
                     {prioritySlices.length}
                   </span>
+                )}
+                <ChevronDown className="w-3.5 h-3.5" />
+                {showReportMenu && (
+                  <div className="absolute top-full right-0 mt-1 bg-white rounded-lg shadow-lg border border-slate-200 py-1 min-w-40 z-50">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowReportMenu(false);
+                        setShowReviewPanel(true);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                    >
+                      <TrendingUp className="w-4 h-4 text-purple-500" />
+                      复盘中心
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowReportMenu(false);
+                        setShowReviewReport(true);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                    >
+                      <FileText className="w-4 h-4 text-indigo-500" />
+                      场次复盘报告
+                    </button>
+                  </div>
                 )}
               </button>
               <button

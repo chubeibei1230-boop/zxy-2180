@@ -10,7 +10,8 @@ import {
   Target,
   AlertCircle,
   Zap,
-  Filter
+  Filter,
+  FileText
 } from 'lucide-react';
 import { useSliceStore } from '../store/useSliceStore';
 import { ExhibitionSlice, ReviewFlagType } from '../types';
@@ -37,9 +38,10 @@ const flagConfig: Record<ReviewFlagType, { label: string; color: string; icon: R
 interface ReviewPanelProps {
   onClose: () => void;
   onJumpToSlice?: (slice: ExhibitionSlice) => void;
+  onViewReport?: (recordId: string) => void;
 }
 
-export const ReviewPanel = ({ onClose, onJumpToSlice }: ReviewPanelProps) => {
+export const ReviewPanel = ({ onClose, onJumpToSlice, onViewReport }: ReviewPanelProps) => {
   const { getReviewSummary, getPriorityOptimizationSlices, slices, getAllReviewRecords, sessionPlans } = useSliceStore();
 
   const summary = getReviewSummary();
@@ -401,7 +403,7 @@ export const ReviewPanel = ({ onClose, onJumpToSlice }: ReviewPanelProps) => {
                         </div>
                       )}
 
-                      <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
+                      <div className="divide-y divide-slate-100 max-h-48 overflow-y-auto">
                         {record.sliceReviews.map((review) => {
                           const slice = allSlicesMap.get(review.sliceId);
                           if (!slice) return null;
@@ -436,6 +438,18 @@ export const ReviewPanel = ({ onClose, onJumpToSlice }: ReviewPanelProps) => {
                           );
                         })}
                       </div>
+                      {onViewReport && (
+                        <div className="px-4 py-3 bg-slate-50 border-t border-slate-100">
+                          <button
+                            onClick={() => onViewReport(record.id)}
+                            className="w-full py-2 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                          >
+                            <FileText className="w-4 h-4" />
+                            查看详细复盘报告
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })

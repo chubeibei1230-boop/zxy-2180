@@ -1,4 +1,4 @@
-import { ExhibitionSlice, RehearsalReviewRecord, SessionPlan } from '../types';
+import { ExhibitionSlice, RehearsalReviewRecord, SessionPlan, ReviewReportData } from '../types';
 import { formatDuration } from './timeUtils';
 
 const getLatestReviewForSlice = (
@@ -351,5 +351,165 @@ export const exportSessionPlanToMarkdown = (
     md += `---\n\n`;
   });
   
+  return md;
+};
+
+export const exportReviewReportToMarkdown = (report: ReviewReportData): string => {
+  const formatDateTime = (dateStr: string) => {
+    return new Date(dateStr).toLocaleString('zh-CN');
+  };
+
+  let md = '# 场次复盘报告\n\n';
+  md += `生成时间: ${new Date().toLocaleString('zh-CN')}\n\n`;
+
+  md += `## 一、场次基本信息\n\n`;
+  md += `- **场次名称**: ${report.sessionPlanName || '未关联场次计划'}\n`;
+  if (report.audience) {
+    md += `- **讲解对象**: ${report.audience}\n`;
+  }
+  md += `- **开始时间**: ${formatDateTime(report.sessionStartTime)}\n`;
+  md += `- **结束时间**: ${formatDateTime(report.sessionEndTime)}\n`;
+  md += `- **参与切片数**: ${report.totalSlices} 个\n`;
+  md += `- **已排练切片**: ${report.rehearsedSlices} 个\n`;
+  if (report.skippedSlices > 0) {
+    md += `- **跳过切片**: ${report.skippedSlices} 个\n`;
+  }
+  md += `\n`;
+
+  md += `## 二、整体表现结论\n\n`;
+  md += `### 时长对比\n\n`;
+  md += `- **计划总时长**: ${formatDuration(report.totalPlannedDurationMinutes)}\n`;
+  md += `- **实际总时长**: ${formatDuration(report.totalActualDurationMinutes)}\n`;
+  const durationDiff = report.totalActualDurationMinutes - report.totalPlannedDurationMinutes;
+  if (durationDiff > 0) {
+    md += `- ⚠️ **超时**: ${formatDuration(durationDiff)} (超出 ${((durationDiff / report.totalPlannedDurationMinutes) * 100).toFixed(1)}%)\n`;
+  } else if (durationDiff < 0) {
+    md += `- 💡 **提前完成**: ${formatDuration(Math.abs(durationDiff))}\n`;
+  } else {
+    md += `- ✅ **时长匹配**: 与计划时长完全一致\n`;
+  }
+  md += `\n`;
+
+  md += `### 质量评估\n\n`;
+  md += `- **平均自评得分**: ${report.averageRating.toFixed(1)} / 5.0 ${getRatingStars(Math.round(report.averageRating))}\n`;
+  md += `- **超时切片数**: ${report.timeoutCount} 个\n`;
+  md += `- **卡顿切片数**: ${report.stuckCount} 个\n`;
+  md += `- **低评分切片数**: ${report.lowRatingCount} 个\n`;
+  md += `\n`;
+
+  if (report.overallNotes) {
+    md += `### 整体备注\n\n`;
+    md += `${report.overallNotes}\n\n`;
+  }
+
+  md += `## 三、问题切片清单\n\n`;
+
+  if (report.prioritySlices.length > 0) {
+    md += `### ⚡ 优先优化切片（${report.prioritySlices.length} 个）\n\n`;
+    report.prioritySlices.forEach((slice, idx) => {
+      const issues = [];
+      if (slice.flags.includes('timeout')) issues.push('⏰ 超时');
+      if (slice.flags.includes('stuck')) issues.push('⚠️ 卡顿');
+      if (slice.flags.includes('lowRating')) issues.push('📊 自评低');
+
+      md += `#### ${idx + 1}. ${slice.sliceTitle}\n\n`;
+      md += `- **问题类型**: ${issues.join('、')}\n`;
+      md += `- **展项**: ${slice.exhibit}\n`;
+      md += `- **计划时长**: ${formatDuration(slice.plannedDurationMinutes)}\n`;
+      md += `- **实际时长**: ${formatDuration(slice.actualDurationMinutes)}`;
+      if (slice.actualDurationMinutes > slice.plannedDurationMinutes) {
+        md += ` （超时 ${formatDuration(slice.actualDurationMinutes - slice.plannedDurationMinutes)}）`;
+      }
+      md += `\n`;
+      md += `- **自评得分**: ${getRatingStars(slice.selfRating)} (${slice.selfRating}/5)\n`;
+
+      if (slice.isStuck && slice.stuckDescription) {
+        md += `- **卡顿描述**: ${slice.stuckDescription}\n`;
+      }
+      if (slice.liveNotes) {
+        md += `- **临场备注**: ${slice.liveNotes}\n`;
+      }
+      if (slice.improvementSuggestion) {
+        md += `- **💡 改进建议**: ${slice.improvementSuggestion}\n`;
+      }
+      md += `\n`;
+    });
+  } else {
+    md += `✅ 本次排练没有发现问题切片，表现优秀！\n\n`;
+  }
+
+  md += `## 四、后续优化建议\n\n`;
+
+  if (report.prioritySlices.length > 0) {
+    md += `根据本次复盘结果，建议按以下优先级进行优化：\n\n`;
+
+    const timeoutSlices = report.prioritySlices.filter((s) => s.flags.includes('timeout'));
+    const stuckSlices = report.prioritySlices.filter((s) => s.flags.includes('stuck'));
+    const lowRatingSlices = report.prioritySlices.filter((s) => s.flags.includes('lowRating'));
+
+    if (timeoutSlices.length > 0) {
+      md += `### 1. 时长控制优化\n\n`;
+      md += `以下切片存在超时问题，建议精简内容或调整讲解重点：\n\n`;
+      timeoutSlices.forEach((slice, idx) => {
+        md += `${idx + 1}. **${slice.sliceTitle}** - 超时 ${formatDuration(slice.actualDurationMinutes - slice.plannedDurationMinutes)}\n`;
+      });
+      md += `\n`;
+    }
+
+    if (stuckSlices.length > 0) {
+      md += `### 2. 流畅度优化\n\n`;
+      md += `以下切片存在卡顿问题，建议加强记忆或准备提示卡：\n\n`;
+      stuckSlices.forEach((slice, idx) => {
+        md += `${idx + 1}. **${slice.sliceTitle}**\n`;
+        if (slice.stuckDescription) {
+          md += `   - 卡顿原因: ${slice.stuckDescription}\n`;
+        }
+      });
+      md += `\n`;
+    }
+
+    if (lowRatingSlices.length > 0) {
+      md += `### 3. 内容质量优化\n\n`;
+      md += `以下切片自评得分较低，建议重新梳理讲解逻辑和内容：\n\n`;
+      lowRatingSlices.forEach((slice, idx) => {
+        md += `${idx + 1}. **${slice.sliceTitle}** - 自评 ${slice.selfRating} 分\n`;
+      });
+      md += `\n`;
+    }
+
+    md += `### 4. 行动计划\n\n`;
+    md += `- [ ] 优先处理标记为"优先优化"的切片\n`;
+    md += `- [ ] 针对超时切片，精简非核心内容\n`;
+    md += `- [ ] 针对卡顿切片，加强记忆和练习\n`;
+    md += `- [ ] 针对低评分切片，重新优化讲解词\n`;
+    md += `- [ ] 完成优化后进行下一轮排练验证\n`;
+    md += `\n`;
+  } else {
+    md += `本次排练表现良好，建议：\n\n`;
+    md += `1. 继续保持当前的讲解状态和水平\n`;
+    md += `2. 可以尝试挑战更短的讲解时长，提高效率\n`;
+    md += `3. 定期复习，防止遗忘\n`;
+    md += `4. 可以尝试面对真实观众进行演练\n`;
+    md += `\n`;
+  }
+
+  md += `## 五、全部切片明细\n\n`;
+  md += `| 序号 | 切片名称 | 展项 | 计划时长 | 实际时长 | 自评 | 状态 | 问题标记 |\n`;
+  md += `|------|----------|------|----------|----------|------|------|----------|\n`;
+
+  report.allSlices.forEach((slice, idx) => {
+    const flags = [];
+    if (slice.flags.includes('timeout')) flags.push('超时');
+    if (slice.flags.includes('stuck')) flags.push('卡顿');
+    if (slice.flags.includes('lowRating')) flags.push('低分');
+    const flagsStr = flags.length > 0 ? flags.join('/') : '无';
+    const statusStr = slice.rehearsalStatus === 'rehearsed' ? '已排练' : '未排练';
+
+    md += `| ${idx + 1} | ${slice.sliceTitle} | ${slice.exhibit} | ${formatDuration(slice.plannedDurationMinutes)} | ${formatDuration(slice.actualDurationMinutes)} | ${slice.selfRating}/5 | ${statusStr} | ${flagsStr} |\n`;
+  });
+
+  md += `\n---\n\n`;
+  md += `*本报告由讲解词管理系统自动生成，生成时间：${new Date().toLocaleString('zh-CN')}*\n`;
+
   return md;
 };

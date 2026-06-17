@@ -72,6 +72,43 @@ export interface ReviewSummary {
   recentReviews: RehearsalReviewRecord[];
 }
 
+export interface ReviewReportSliceData {
+  sliceId: string;
+  sliceTitle: string;
+  exhibit: string;
+  plannedDurationMinutes: number;
+  actualDurationMinutes: number;
+  isStuck: boolean;
+  stuckDescription: string;
+  liveNotes: string;
+  selfRating: SelfRating;
+  improvementSuggestion: string;
+  rehearsalStatus: RehearsalStep;
+  flags: ReviewFlagType[];
+  isPriority: boolean;
+}
+
+export interface ReviewReportData {
+  recordId: string;
+  sessionPlanId?: string;
+  sessionPlanName?: string;
+  audience?: string;
+  sessionStartTime: string;
+  sessionEndTime: string;
+  totalPlannedDurationMinutes: number;
+  totalActualDurationMinutes: number;
+  overallNotes: string;
+  averageRating: number;
+  totalSlices: number;
+  rehearsedSlices: number;
+  skippedSlices: number;
+  timeoutCount: number;
+  stuckCount: number;
+  lowRatingCount: number;
+  prioritySlices: ReviewReportSliceData[];
+  allSlices: ReviewReportSliceData[];
+}
+
 export interface ExhibitionSlice {
   id: string;
   title: string;
@@ -122,6 +159,7 @@ export interface AppState {
   reviewRecords: RehearsalReviewRecord[];
   showReviewForm: boolean;
   showReviewPanel: boolean;
+  showReviewReport: boolean;
   sessionStartTime: string | null;
   reviewDraft: ReviewDraft | null;
   sliceRehearsalData: SliceRehearsalData[];
@@ -131,6 +169,7 @@ export interface AppState {
   editingSessionPlanId: string | null;
   activeSessionPlanId: string | null;
   viewingSessionPlanId: string | null;
+  viewingReviewRecordId: string | null;
 }
 
 export interface AppActions {
@@ -180,4 +219,8 @@ export interface AppActions {
   getSessionPlanLatestReview: (planId: string) => RehearsalReviewRecord | undefined;
   startRehearsalWithPlan: (planId: string) => void;
   exportSessionPlanChecklist: (planId: string) => void;
+  setShowReviewReport: (show: boolean) => void;
+  setViewingReviewRecordId: (id: string | null) => void;
+  getReviewReportData: (recordId: string) => ReviewReportData | undefined;
+  exportReviewReport: (recordId: string) => void;
 }

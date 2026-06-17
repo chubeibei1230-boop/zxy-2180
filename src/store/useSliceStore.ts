@@ -1,17 +1,19 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type {
+import {
   AppState,
   AppActions,
   ExhibitionSlice,
   Filters,
   RehearsalReviewRecord,
   ReviewFlagType,
-  SessionPlan
+  SessionPlan,
+  ReviewReportData,
+  ReviewReportSliceData
 } from '../types';
 import { generateId } from '../utils/timeUtils';
 import { runAllChecks } from '../utils/qualityChecker';
-import { exportToMarkdown, downloadFile, exportSessionPlanToMarkdown } from '../utils/exportUtils';
+import { exportToMarkdown, downloadFile, exportSessionPlanToMarkdown, exportReviewReportToMarkdown } from '../utils/exportUtils';
 import { mockSlices } from '../data/mockData';
 
 const initialFilters: Filters = {
@@ -34,6 +36,7 @@ const initialState: AppState = {
   reviewRecords: [],
   showReviewForm: false,
   showReviewPanel: false,
+  showReviewReport: false,
   sessionStartTime: null,
   reviewDraft: null,
   sliceRehearsalData: [],
@@ -42,7 +45,8 @@ const initialState: AppState = {
   showSessionPlanForm: false,
   editingSessionPlanId: null,
   activeSessionPlanId: null,
-  viewingSessionPlanId: null
+  viewingSessionPlanId: null,
+  viewingReviewRecordId: null
 };
 
 export const useSliceStore = create<AppState & AppActions>()(
@@ -556,6 +560,112 @@ export const useSliceStore = create<AppState & AppActions>()(
 
         const content = exportSessionPlanToMarkdown(plan, slices, reviewRecords);
         const filename = `场次计划_${plan.name}_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.md`;
+        downloadFile(content, filename, 'text/markdown');
+      },
+
+      setShowReviewReport: (show) => {
+        set({ showReviewReport: show });
+      },
+
+      setViewingReviewRecordId: (id) => {
+        set({ viewingReviewRecordId: id });
+      },
+
+      getReviewReportData: (recordId) => {
+        const { reviewRecords, slices, sessionPlans } = get();
+        const record = reviewRecords.find((r) => r.id === recordId);
+        if (!record) return undefined;
+
+        const sessionPlan = record.sessionPlanId
+          ? sessionPlans.find((p) => p.id === record.sessionPlanId)
+          : undefined;
+
+        const sliceMap = new Map(slices.map((s) => [s.id, s]));
+
+        const allSlices: ReviewReportSliceData[] = record.sliceReviews
+          .map((review) => {
+            const slice = sliceMap.get(review.sliceId);
+            if (!slice) return null;
+
+            const flags: ReviewFlagType[] = [];
+            if (review.actualDurationMinutes > slice.durationMinutes) {
+              flags.push('timeout');
+            }
+            if (review.isStuck) {
+              flags.push('stuck');
+            }
+            if (review.selfRating <= 2) {
+              flags.push('lowRating');
+            }
+
+            return {
+              sliceId: slice.id,
+              sliceTitle: slice.title,
+              exhibit: slice.exhibit,
+              plannedDurationMinutes: slice.durationMinutes,
+              actualDurationMinutes: review.actualDurationMinutes,
+              isStuck: review.isStuck,
+              stuckDescription: review.stuckDescription,
+              liveNotes: review.liveNotes,
+              selfRating: review.selfRating,
+              improvementSuggestion: review.improvementSuggestion,
+              rehearsalStatus: review.rehearsalStatus,
+              flags,
+              isPriority: flags.length > 0
+            };
+          })
+          .filter((s): s is ReviewReportSliceData => s !== null);
+
+        const prioritySlices = allSlices
+          .filter((s) => s.isPriority)
+          .sort((a, b) => b.flags.length - a.flags.length);
+
+        const rehearsedSlices = allSlices.filter(
+          (s) => s.rehearsalStatus === 'rehearsed'
+        );
+        const skippedSlices = allSlices.filter(
+          (s) => s.rehearsalStatus !== 'rehearsed'
+        );
+
+        const totalPlannedDuration = allSlices.reduce(
+          (sum, s) => sum + s.plannedDurationMinutes,
+          0
+        );
+
+        const avgRating = rehearsedSlices.length > 0
+          ? rehearsedSlices.reduce((sum, s) => sum + s.selfRating, 0) / rehearsedSlices.length
+          : 0;
+
+        const report: ReviewReportData = {
+          recordId: record.id,
+          sessionPlanId: sessionPlan?.id,
+          sessionPlanName: sessionPlan?.name,
+          audience: sessionPlan?.audience,
+          sessionStartTime: record.sessionStartTime,
+          sessionEndTime: record.sessionEndTime,
+          totalPlannedDurationMinutes: totalPlannedDuration,
+          totalActualDurationMinutes: record.totalActualDurationMinutes,
+          overallNotes: record.overallNotes,
+          averageRating: avgRating,
+          totalSlices: allSlices.length,
+          rehearsedSlices: rehearsedSlices.length,
+          skippedSlices: skippedSlices.length,
+          timeoutCount: allSlices.filter((s) => s.flags.includes('timeout')).length,
+          stuckCount: allSlices.filter((s) => s.flags.includes('stuck')).length,
+          lowRatingCount: allSlices.filter((s) => s.flags.includes('lowRating')).length,
+          prioritySlices,
+          allSlices
+        };
+
+        return report;
+      },
+
+      exportReviewReport: (recordId) => {
+        const reportData = get().getReviewReportData(recordId);
+        if (!reportData) return;
+
+        const content = exportReviewReportToMarkdown(reportData);
+        const filename = `复盘报告_${reportData.sessionPlanName || '排练'}_${new Date(reportData.sessionStartTime).toLocaleDateString('zh-CN').replace(/\//g, '-')}.md`;
         downloadFile(content, filename, 'text/markdown');
       }
     }),
