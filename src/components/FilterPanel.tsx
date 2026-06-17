@@ -7,9 +7,19 @@ export const FilterPanel = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    setFilters({
-      [name]: type === 'number' ? parseFloat(value) || 0 : value
-    });
+    if (type === 'number') {
+      if (value === '') {
+        if (name === 'minDuration') {
+          setFilters({ [name]: 0 });
+        } else if (name === 'maxDuration') {
+          setFilters({ [name]: 999 });
+        }
+      } else {
+        setFilters({ [name]: parseFloat(value) });
+      }
+    } else {
+      setFilters({ [name]: value });
+    }
   };
 
   const clearFilters = () => {

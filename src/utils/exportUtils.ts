@@ -2,9 +2,10 @@ import { ExhibitionSlice } from '../types';
 import { formatDuration } from './timeUtils';
 
 export const exportToMarkdown = (slices: ExhibitionSlice[]): string => {
-  const activeSlices = [...slices]
+  const allSlices = [...slices]
     .filter(s => !s.isBackup)
     .sort((a, b) => a.orderIndex - b.orderIndex);
+  const activeSlices = allSlices.filter(s => s.rehearsalStatus !== 'skipped');
   
   const totalDuration = activeSlices.reduce((sum, s) => sum + s.durationMinutes, 0);
   const statusMap: Record<string, string> = {
@@ -17,20 +18,24 @@ export const exportToMarkdown = (slices: ExhibitionSlice[]): string => {
   let md = '# 讲解词排练清单\n\n';
   md += `生成时间: ${new Date().toLocaleString('zh-CN')}\n\n`;
   md += `## 概览\n\n`;
-  md += `- 总切片数: ${activeSlices.length}\n`;
-  md += `- 预计总时长: ${formatDuration(totalDuration)}\n\n`;
+  md += `- 总切片数: ${allSlices.length}\n`;
+  md += `- 预计总时长（不含临时跳过）: ${formatDuration(totalDuration)}\n`;
+  if (allSlices.length !== activeSlices.length) {
+    md += `- 临时跳过切片数: ${allSlices.length - activeSlices.length}\n`;
+  }
+  md += `\n`;
   md += `## 排练清单\n\n`;
   md += `| 序号 | 标题 | 关联展项 | 时长 | 状态 | 关键句 |\n`;
   md += `|------|------|----------|------|------|--------|\n`;
   
-  activeSlices.forEach((slice, index) => {
+  allSlices.forEach((slice, index) => {
     md += `| ${index + 1} | ${slice.title} | ${slice.exhibit} | ${slice.durationMinutes}分钟 | ${statusMap[slice.rehearsalStatus]} | ${slice.keySentence} |\n`;
   });
   
   md += `\n---\n\n`;
   md += `## 详细内容\n\n`;
   
-  activeSlices.forEach((slice, index) => {
+  allSlices.forEach((slice, index) => {
     md += `### ${index + 1}. ${slice.title}\n\n`;
     md += `- **关联展项**: ${slice.exhibit}\n`;
     md += `- **建议时长**: ${slice.durationMinutes}分钟\n`;
@@ -49,9 +54,10 @@ export const exportToMarkdown = (slices: ExhibitionSlice[]): string => {
 };
 
 export const exportToPlainText = (slices: ExhibitionSlice[]): string => {
-  const activeSlices = [...slices]
+  const allSlices = [...slices]
     .filter(s => !s.isBackup)
     .sort((a, b) => a.orderIndex - b.orderIndex);
+  const activeSlices = allSlices.filter(s => s.rehearsalStatus !== 'skipped');
   
   const totalDuration = activeSlices.reduce((sum, s) => sum + s.durationMinutes, 0);
   const statusMap: Record<string, string> = {
@@ -65,11 +71,15 @@ export const exportToPlainText = (slices: ExhibitionSlice[]): string => {
   text += '  讲解词排练清单\n';
   text += `  生成时间: ${new Date().toLocaleString('zh-CN')}\n`;
   text += '==============================\n\n';
-  text += `总切片数: ${activeSlices.length}\n`;
-  text += `预计总时长: ${formatDuration(totalDuration)}\n\n`;
+  text += `总切片数: ${allSlices.length}\n`;
+  text += `预计总时长（不含临时跳过）: ${formatDuration(totalDuration)}\n`;
+  if (allSlices.length !== activeSlices.length) {
+    text += `临时跳过切片数: ${allSlices.length - activeSlices.length}\n`;
+  }
+  text += '\n';
   text += '------------------------------\n\n';
   
-  activeSlices.forEach((slice, index) => {
+  allSlices.forEach((slice, index) => {
     text += `【${index + 1}】${slice.title}\n`;
     text += `  展项: ${slice.exhibit}\n`;
     text += `  时长: ${slice.durationMinutes}分钟 | 状态: ${statusMap[slice.rehearsalStatus]}\n`;

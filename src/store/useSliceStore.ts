@@ -148,8 +148,7 @@ export const useSliceStore = create<AppState & AppActions>()(
             .slices.filter((s) => !s.isBackup && s.rehearsalStatus !== 'skipped')
             .sort((a, b) => a.orderIndex - b.orderIndex);
           if (activeSlices.length > 0) {
-            const firstIndex = get().slices.findIndex((s) => s.id === activeSlices[0].id);
-            set({ currentRehearsalIndex: firstIndex });
+            set({ currentRehearsalIndex: 0 });
           }
         }
       },
