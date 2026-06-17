@@ -11,7 +11,9 @@ import {
   Zap,
   Save,
   FileText,
-  AlertCircle
+  AlertCircle,
+  Target,
+  Calendar
 } from 'lucide-react';
 import { useSliceStore } from '../store/useSliceStore';
 import { RehearsalTimer, RehearsalTimerRef } from './RehearsalTimer';
@@ -31,25 +33,38 @@ export const RehearsalMode = () => {
     sliceRehearsalData,
     sessionStartTime,
     saveReviewDraft,
-    setShowReviewForm
+    setShowReviewForm,
+    activeSessionPlanId,
+    getSessionPlan,
+    getSessionPlanActiveSlices,
+    setActiveSessionPlanId
   } = useSliceStore();
 
   const timerRef = useRef<RehearsalTimerRef>(null);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
-  const activeSlices = useMemo(() =>
-    slices
+  const activeSessionPlan = activeSessionPlanId ? getSessionPlan(activeSessionPlanId) : null;
+
+  const activeSlices = useMemo(() => {
+    if (activeSessionPlanId) {
+      return getSessionPlanActiveSlices(activeSessionPlanId);
+    }
+    return slices
       .filter((s) => !s.isBackup && s.rehearsalStatus !== 'skipped')
-      .sort((a, b) => a.orderIndex - b.orderIndex),
-    [slices]
-  );
+      .sort((a, b) => a.orderIndex - b.orderIndex);
+  }, [slices, activeSessionPlanId, getSessionPlanActiveSlices]);
 
   const currentSlice = activeSlices[currentRehearsalIndex];
   const nextSlice = activeSlices[currentRehearsalIndex + 1];
 
   const attentionSlices = activeSlices.filter((s) => s.reviewFlags.length > 0);
 
-  const totalDuration = getTotalDuration();
+  const totalDuration = useMemo(() => {
+    if (activeSessionPlanId) {
+      return activeSlices.reduce((sum, s) => sum + s.durationMinutes, 0);
+    }
+    return getTotalDuration();
+  }, [activeSlices, activeSessionPlanId, getTotalDuration]);
 
   const completedSliceData = sliceRehearsalData.filter((d) => d.isCompleted);
   const elapsedDuration = completedSliceData.reduce(
@@ -191,6 +206,7 @@ export const RehearsalMode = () => {
     } else {
       setRehearsalMode(false);
       setShowExitConfirm(false);
+      setActiveSessionPlanId(null);
     }
   };
 
@@ -245,15 +261,38 @@ export const RehearsalMode = () => {
 
       <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
         <div className="flex items-center gap-4">
-          <h2 className="text-xl font-bold text-white">排练模式</h2>
-          <span className="text-slate-400 text-sm">
-            {currentRehearsalIndex + 1} / {activeSlices.length}
-          </span>
+          <div>
+            <h2 className="text-xl font-bold text-white">
+              排练模式
+              {activeSessionPlan && (
+                <span className="ml-3 text-sm font-normal text-indigo-300 flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4" />
+                  {activeSessionPlan.name}
+                </span>
+              )}
+            </h2>
+            <span className="text-slate-400 text-sm">
+              {currentRehearsalIndex + 1} / {activeSlices.length}
+            </span>
+            {activeSessionPlan && (
+              <span className="ml-3 text-xs text-indigo-400">
+                目标: {formatDuration(activeSessionPlan.targetDurationMinutes)}
+              </span>
+            )}
+          </div>
           <span className="text-xs text-emerald-400 bg-emerald-500/20 px-2 py-1 rounded">
             已完成 {completedCount} 个
           </span>
         </div>
         <div className="flex items-center gap-4 text-slate-300 text-sm">
+          {activeSessionPlan && (
+            <>
+              <span className="flex items-center gap-1 px-3 py-1.5 bg-indigo-500/20 text-indigo-300 rounded-full border border-indigo-500/30">
+                <Target className="w-4 h-4" />
+                已用 {formatDuration(Math.ceil(elapsedDuration))} / 目标 {formatDuration(activeSessionPlan.targetDurationMinutes)}
+              </span>
+            </>
+          )}
           {attentionSlices.length > 0 && (
             <span className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 text-amber-300 rounded-full border border-amber-500/30">
               <Zap className="w-4 h-4" />

@@ -3,6 +3,27 @@ export type SelfRating = 1 | 2 | 3 | 4 | 5;
 export type ReviewFlagType = 'timeout' | 'stuck' | 'lowRating';
 export type RehearsalStep = 'unrehearsed' | 'rehearsed' | 'skipped_during';
 
+export interface SessionPlanSlice {
+  sliceId: string;
+  orderIndex: number;
+  isExcluded: boolean;
+}
+
+export interface SessionPlan {
+  id: string;
+  name: string;
+  audience: string;
+  targetDurationMinutes: number;
+  scheduledStartTime: string;
+  slices: SessionPlanSlice[];
+  createdAt: string;
+  updatedAt: string;
+  lastRehearsalId?: string;
+  rehearsalCount: number;
+}
+
+export type DurationRiskLevel = 'normal' | 'warning' | 'danger';
+
 export interface SliceReview {
   sliceId: string;
   actualDurationMinutes: number;
@@ -22,6 +43,7 @@ export interface RehearsalReviewRecord {
   overallNotes: string;
   sliceReviews: SliceReview[];
   createdAt: string;
+  sessionPlanId?: string;
 }
 
 export interface SliceRehearsalData {
@@ -102,6 +124,12 @@ export interface AppState {
   sessionStartTime: string | null;
   reviewDraft: ReviewDraft | null;
   sliceRehearsalData: SliceRehearsalData[];
+  sessionPlans: SessionPlan[];
+  showSessionPlanPanel: boolean;
+  showSessionPlanForm: boolean;
+  editingSessionPlanId: string | null;
+  activeSessionPlanId: string | null;
+  viewingSessionPlanId: string | null;
 }
 
 export interface AppActions {
@@ -135,4 +163,20 @@ export interface AppActions {
   clearReviewDraft: () => void;
   continueFromDraft: () => void;
   getAllReviewRecords: () => RehearsalReviewRecord[];
+  setShowSessionPlanPanel: (show: boolean) => void;
+  setShowSessionPlanForm: (show: boolean) => void;
+  setEditingSessionPlanId: (id: string | null) => void;
+  setViewingSessionPlanId: (id: string | null) => void;
+  setActiveSessionPlanId: (id: string | null) => void;
+  addSessionPlan: (plan: Omit<SessionPlan, 'id' | 'createdAt' | 'updatedAt' | 'rehearsalCount'>) => void;
+  updateSessionPlan: (id: string, updates: Partial<SessionPlan>) => void;
+  deleteSessionPlan: (id: string) => void;
+  getSessionPlan: (id: string) => SessionPlan | undefined;
+  getSessionPlanDuration: (planId: string) => number;
+  getSessionPlanDurationRisk: (planId: string) => { level: DurationRiskLevel; diffMinutes: number; percent: number };
+  getSessionPlanActiveSlices: (planId: string) => ExhibitionSlice[];
+  getSessionPlanReviews: (planId: string) => RehearsalReviewRecord[];
+  getSessionPlanLatestReview: (planId: string) => RehearsalReviewRecord | undefined;
+  startRehearsalWithPlan: (planId: string) => void;
+  exportSessionPlanChecklist: (planId: string) => void;
 }

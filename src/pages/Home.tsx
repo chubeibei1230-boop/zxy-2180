@@ -13,7 +13,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy
 } from '@dnd-kit/sortable';
-import { Plus, Download, Play, Mic2, TrendingUp, Target, ChevronRight, Clock, AlertTriangle, Star, Zap, FileText } from 'lucide-react';
+import { Plus, Download, Play, Mic2, TrendingUp, Target, ChevronRight, Clock, AlertTriangle, Star, Zap, FileText, Calendar } from 'lucide-react';
 import { useSliceStore } from '../store/useSliceStore';
 import { StatsBar } from '../components/StatsBar';
 import { FilterPanel } from '../components/FilterPanel';
@@ -24,6 +24,7 @@ import { QualityPanel } from '../components/QualityPanel';
 import { RehearsalMode } from '../components/RehearsalMode';
 import { ReviewForm } from '../components/ReviewForm';
 import { ReviewPanel } from '../components/ReviewPanel';
+import { SessionPlanPanel } from '../components/SessionPlanPanel';
 import { ExhibitionSlice, ReviewFlagType } from '../types';
 
 const flagConfig: Record<ReviewFlagType, { color: string; bgColor: string }> = {
@@ -50,7 +51,10 @@ export default function Home() {
     getPriorityOptimizationSlices,
     reviewDraft,
     continueFromDraft,
-    clearReviewDraft
+    clearReviewDraft,
+    showSessionPlanPanel,
+    setShowSessionPlanPanel,
+    sessionPlans
   } = useSliceStore();
 
   const filteredSlices = getFilteredSlices();
@@ -118,6 +122,9 @@ export default function Home() {
           onJumpToSlice={handleJumpToSlice}
         />
       )}
+      {showSessionPlanPanel && (
+        <SessionPlanPanel onClose={() => setShowSessionPlanPanel(false)} />
+      )}
       {editingSliceId !== undefined && (
         <SliceEditor sliceId={editingSliceId} onClose={handleCloseEditor} />
       )}
@@ -135,6 +142,18 @@ export default function Home() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowSessionPlanPanel(true)}
+                className="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/30 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+              >
+                <Calendar className="w-4 h-4" />
+                场次计划
+                {sessionPlans.length > 0 && (
+                  <span className="px-1.5 py-0.5 bg-amber-500 text-xs rounded-full font-bold">
+                    {sessionPlans.length}
+                  </span>
+                )}
+              </button>
               <button
                 onClick={() => setShowReviewPanel(true)}
                 className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-400/30 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"

@@ -9,7 +9,8 @@ import {
   Calendar,
   Target,
   AlertCircle,
-  Zap
+  Zap,
+  Filter
 } from 'lucide-react';
 import { useSliceStore } from '../store/useSliceStore';
 import { ExhibitionSlice, ReviewFlagType } from '../types';
@@ -39,12 +40,13 @@ interface ReviewPanelProps {
 }
 
 export const ReviewPanel = ({ onClose, onJumpToSlice }: ReviewPanelProps) => {
-  const { getReviewSummary, getPriorityOptimizationSlices, slices, getAllReviewRecords } = useSliceStore();
+  const { getReviewSummary, getPriorityOptimizationSlices, slices, getAllReviewRecords, sessionPlans } = useSliceStore();
 
   const summary = getReviewSummary();
   const prioritySlices = getPriorityOptimizationSlices();
   const allRecords = getAllReviewRecords();
   const [selectedTab, setSelectedTab] = useState<'summary' | 'priority' | 'history'>('summary');
+  const [selectedSessionPlanId, setSelectedSessionPlanId] = useState<string | null>(null);
 
   const allSlicesMap = useMemo(() => {
     const map = new Map<string, ExhibitionSlice>();
@@ -302,8 +304,27 @@ export const ReviewPanel = ({ onClose, onJumpToSlice }: ReviewPanelProps) => {
 
           {selectedTab === 'history' && (
             <div className="space-y-4">
-              {allRecords.length > 0 ? (
-                allRecords.map((record, recordIndex) => {
+              {sessionPlans.length > 0 && (
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                  <Filter className="w-4 h-4 text-slate-500" />
+                  <span className="text-sm text-slate-600">按场次筛选：</span>
+                  <select
+                    value={selectedSessionPlanId || ''}
+                    onChange={(e) => setSelectedSessionPlanId(e.target.value || null)}
+                    className="flex-1 px-3 py-1.5 text-sm border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  >
+                    <option value="">全部场次</option>
+                    {sessionPlans.map((plan) => (
+                      <option key={plan.id} value={plan.id}>
+                        {plan.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {(selectedSessionPlanId ? allRecords.filter(r => r.sessionPlanId === selectedSessionPlanId) : allRecords).length > 0 ? (
+                (selectedSessionPlanId ? allRecords.filter(r => r.sessionPlanId === selectedSessionPlanId) : allRecords).map((record, recordIndex, filteredArray) => {
                   const avgRating = record.sliceReviews.length > 0
                     ? record.sliceReviews.reduce((sum, r) => sum + r.selfRating, 0) / record.sliceReviews.length
                     : 0;
@@ -316,6 +337,10 @@ export const ReviewPanel = ({ onClose, onJumpToSlice }: ReviewPanelProps) => {
                     (r) => r.rehearsalStatus === 'rehearsed'
                   ).length;
 
+                  const sessionPlan = record.sessionPlanId
+                    ? sessionPlans.find((p) => p.id === record.sessionPlanId)
+                    : null;
+
                   return (
                     <div
                       key={record.id}
@@ -324,14 +349,15 @@ export const ReviewPanel = ({ onClose, onJumpToSlice }: ReviewPanelProps) => {
                       <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-gradient-to-br from-indigo-400 to-purple-400 rounded-lg flex items-center justify-center text-white font-bold">
-                            #{allRecords.length - recordIndex}
+                            #{filteredArray.length - recordIndex}
                           </div>
                           <div>
                             <h4 className="font-semibold text-slate-800">
-                              第 {allRecords.length - recordIndex} 次排练
+                              {sessionPlan ? sessionPlan.name : `第 ${filteredArray.length - recordIndex} 次排练`}
                             </h4>
                             <p className="text-xs text-slate-500">
                               {formatDate(record.sessionStartTime)} - {formatDate(record.sessionEndTime)}
+                              {!sessionPlan && ' · 无场次计划'}
                             </p>
                           </div>
                         </div>
@@ -418,9 +444,13 @@ export const ReviewPanel = ({ onClose, onJumpToSlice }: ReviewPanelProps) => {
                   <div className="w-16 h-16 mx-auto mb-4 bg-slate-50 rounded-full flex items-center justify-center">
                     <Calendar className="w-8 h-8 text-slate-300" />
                   </div>
-                  <h3 className="text-lg font-semibold text-slate-700 mb-2">暂无历史复盘记录</h3>
+                  <h3 className="text-lg font-semibold text-slate-700 mb-2">
+                    {selectedSessionPlanId ? '该场次暂无复盘记录' : '暂无历史复盘记录'}
+                  </h3>
                   <p className="text-slate-500 text-sm">
-                    完成一次排练并填写复盘记录后，这里会展示你的历史数据
+                    {selectedSessionPlanId
+                      ? '这个场次计划还没有排练复盘记录'
+                      : '完成一次排练并填写复盘记录后，这里会展示你的历史数据'}
                   </p>
                 </div>
               )}

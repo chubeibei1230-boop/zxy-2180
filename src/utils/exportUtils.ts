@@ -1,4 +1,4 @@
-import { ExhibitionSlice, RehearsalReviewRecord } from '../types';
+import { ExhibitionSlice, RehearsalReviewRecord, SessionPlan } from '../types';
 import { formatDuration } from './timeUtils';
 
 const getLatestReviewForSlice = (
@@ -217,4 +217,139 @@ export const downloadFile = (content: string, filename: string, mimeType: string
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+};
+
+export const exportSessionPlanToMarkdown = (
+  plan: SessionPlan,
+  slices: ExhibitionSlice[],
+  reviewRecords: RehearsalReviewRecord[] = []
+): string => {
+  const sliceMap = new Map(slices.map((s) => [s.id, s]));
+  const planSlices = plan.slices
+    .filter((s) => !s.isExcluded)
+    .sort((a, b) => a.orderIndex - b.orderIndex)
+    .map((s) => sliceMap.get(s.sliceId))
+    .filter((s): s is ExhibitionSlice => s !== undefined);
+  
+  const excludedSlices = plan.slices
+    .filter((s) => s.isExcluded)
+    .map((s) => sliceMap.get(s.sliceId))
+    .filter((s): s is ExhibitionSlice => s !== undefined);
+
+  const totalDuration = planSlices.reduce((sum, s) => sum + s.durationMinutes, 0);
+  const diffDuration = totalDuration - plan.targetDurationMinutes;
+  
+  const planReviews = reviewRecords.filter((r) => r.sessionPlanId === plan.id);
+  const latestReview = planReviews.length > 0 ? planReviews[0] : null;
+
+  let md = `# 场次计划：${plan.name}\n\n`;
+  md += `生成时间: ${new Date().toLocaleString('zh-CN')}\n\n`;
+  
+  md += `## 场次信息\n\n`;
+  md += `- **计划名称**: ${plan.name}\n`;
+  md += `- **讲解对象**: ${plan.audience || '未设置'}\n`;
+  md += `- **目标总时长**: ${formatDuration(plan.targetDurationMinutes)}\n`;
+  md += `- **预计开始时间**: ${new Date(plan.scheduledStartTime).toLocaleString('zh-CN')}\n`;
+  md += `- **创建时间**: ${new Date(plan.createdAt).toLocaleString('zh-CN')}\n`;
+  md += `- **排练次数**: ${plan.rehearsalCount} 次\n`;
+  md += `\n`;
+
+  md += `## 时长预估\n\n`;
+  md += `- **预计总时长**: ${formatDuration(totalDuration)}\n`;
+  md += `- **目标时长**: ${formatDuration(plan.targetDurationMinutes)}\n`;
+  if (diffDuration > 0) {
+    md += `- ⚠️ **超出目标**: ${formatDuration(diffDuration)} (超出 ${((diffDuration / plan.targetDurationMinutes) * 100).toFixed(1)}%)\n`;
+  } else if (diffDuration < 0) {
+    md += `- 💡 **少于目标**: ${formatDuration(Math.abs(diffDuration))} (剩余 ${((Math.abs(diffDuration) / plan.targetDurationMinutes) * 100).toFixed(1)}%的缓冲时间)\n`;
+  } else {
+    md += `- ✅ **时长匹配**: 与目标时长完全一致\n`;
+  }
+  md += `- **切片数量**: ${planSlices.length} 个${excludedSlices.length > 0 ? ` (临时排除 ${excludedSlices.length} 个)` : ''}\n`;
+  md += `\n`;
+
+  if (latestReview) {
+    md += `## 最近一次复盘结论\n\n`;
+    const avgRating = latestReview.sliceReviews.length > 0
+      ? (latestReview.sliceReviews.reduce((s, r) => s + r.selfRating, 0) / latestReview.sliceReviews.length).toFixed(1)
+      : '-';
+    const timeoutCount = latestReview.sliceReviews.filter((r) => {
+      const sl = sliceMap.get(r.sliceId);
+      return sl && r.actualDurationMinutes > sl.durationMinutes;
+    }).length;
+    const stuckCount = latestReview.sliceReviews.filter((r) => r.isStuck).length;
+    const lowRatingCount = latestReview.sliceReviews.filter((r) => r.selfRating <= 2).length;
+
+    md += `- **复盘时间**: ${new Date(latestReview.createdAt).toLocaleString('zh-CN')}\n`;
+    md += `- **实际总时长**: ${formatDuration(latestReview.totalActualDurationMinutes)}\n`;
+    md += `- **平均自评得分**: ${avgRating} / 5.0 ${getRatingStars(Math.round(parseFloat(avgRating)))}\n`;
+    md += `- **超时切片数**: ${timeoutCount}\n`;
+    md += `- **卡顿切片数**: ${stuckCount}\n`;
+    md += `- **低评分切片数**: ${lowRatingCount}\n`;
+    if (latestReview.overallNotes) {
+      md += `- **整体备注**: ${latestReview.overallNotes}\n`;
+    }
+    md += `\n`;
+  }
+
+  if (excludedSlices.length > 0) {
+    md += `## 临时排除的切片\n\n`;
+    excludedSlices.forEach((slice, idx) => {
+      md += `${idx + 1}. ${slice.title} (${slice.durationMinutes}分钟)\n`;
+    });
+    md += `\n`;
+  }
+
+  md += `## 切片顺序与清单\n\n`;
+  md += `| 序号 | 标题 | 关联展项 | 预计时长 | 关键句 |\n`;
+  md += `|------|------|----------|----------|--------|\n`;
+  
+  planSlices.forEach((slice, index) => {
+    md += `| ${index + 1} | ${slice.title} | ${slice.exhibit} | ${slice.durationMinutes}分钟 | ${slice.keySentence} |\n`;
+  });
+  
+  md += `\n---\n\n`;
+  md += `## 详细内容\n\n`;
+  
+  planSlices.forEach((slice, index) => {
+    const latest = getLatestReviewForSlice(slice.id, planReviews);
+    md += `### ${index + 1}. ${slice.title}\n\n`;
+    md += `- **关联展项**: ${slice.exhibit}\n`;
+    md += `- **预计时长**: ${slice.durationMinutes}分钟\n`;
+    md += `\n`;
+    md += `#### 关键句\n\n${slice.keySentence}\n\n`;
+    if (slice.errorReminder) {
+      md += `#### 易错提醒\n\n${slice.errorReminder}\n\n`;
+    }
+    if (slice.alternativeVersion) {
+      md += `#### 备用说法\n\n${slice.alternativeVersion}\n\n`;
+    }
+
+    if (latest) {
+      const { review, record } = latest;
+      md += `#### 📋 最近一次复盘（${new Date(record.createdAt).toLocaleDateString('zh-CN')}）\n\n`;
+      md += `- **实际耗时**: ${review.actualDurationMinutes}分钟`;
+      if (review.actualDurationMinutes > slice.durationMinutes) {
+        md += ` （⚠️ 超出预计 ${(review.actualDurationMinutes - slice.durationMinutes).toFixed(1)} 分钟）`;
+      } else if (review.actualDurationMinutes < slice.durationMinutes) {
+        md += ` （节省 ${(slice.durationMinutes - review.actualDurationMinutes).toFixed(1)} 分钟）`;
+      }
+      md += `\n`;
+      md += `- **自评得分**: ${getRatingStars(review.selfRating)} (${review.selfRating}/5)\n`;
+      md += `- **流畅度**: ${review.isStuck ? '⚠️ 有卡顿' : '✅ 流畅'}\n`;
+      if (review.isStuck && review.stuckDescription) {
+        md += `  - 卡顿描述: ${review.stuckDescription}\n`;
+      }
+      if (review.liveNotes) {
+        md += `- **临场备注**: ${review.liveNotes}\n`;
+      }
+      if (review.improvementSuggestion) {
+        md += `- **💡 改进建议**: ${review.improvementSuggestion}\n`;
+      }
+      md += `\n`;
+    }
+
+    md += `---\n\n`;
+  });
+  
+  return md;
 };

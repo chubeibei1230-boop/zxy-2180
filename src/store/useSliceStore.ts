@@ -6,11 +6,12 @@ import type {
   ExhibitionSlice,
   Filters,
   RehearsalReviewRecord,
-  ReviewFlagType
+  ReviewFlagType,
+  SessionPlan
 } from '../types';
 import { generateId } from '../utils/timeUtils';
 import { runAllChecks } from '../utils/qualityChecker';
-import { exportToMarkdown, downloadFile } from '../utils/exportUtils';
+import { exportToMarkdown, downloadFile, exportSessionPlanToMarkdown } from '../utils/exportUtils';
 import { mockSlices } from '../data/mockData';
 
 const initialFilters: Filters = {
@@ -35,7 +36,13 @@ const initialState: AppState = {
   showReviewPanel: false,
   sessionStartTime: null,
   reviewDraft: null,
-  sliceRehearsalData: []
+  sliceRehearsalData: [],
+  sessionPlans: [],
+  showSessionPlanPanel: false,
+  showSessionPlanForm: false,
+  editingSessionPlanId: null,
+  activeSessionPlanId: null,
+  viewingSessionPlanId: null
 };
 
 export const useSliceStore = create<AppState & AppActions>()(
@@ -249,10 +256,12 @@ export const useSliceStore = create<AppState & AppActions>()(
 
       saveRehearsalReview: (recordData) => {
         const now = new Date().toISOString();
+        const { activeSessionPlanId } = get();
         const newRecord: RehearsalReviewRecord = {
           ...recordData,
           id: generateId(),
-          createdAt: now
+          createdAt: now,
+          sessionPlanId: activeSessionPlanId || undefined
         };
 
         set((state) => {
@@ -282,13 +291,29 @@ export const useSliceStore = create<AppState & AppActions>()(
             };
           });
 
+          let updatedSessionPlans = state.sessionPlans;
+          if (activeSessionPlanId) {
+            updatedSessionPlans = state.sessionPlans.map((plan) =>
+              plan.id === activeSessionPlanId
+                ? {
+                    ...plan,
+                    rehearsalCount: plan.rehearsalCount + 1,
+                    lastRehearsalId: newRecord.id,
+                    updatedAt: now
+                  }
+                : plan
+            );
+          }
+
           return {
             reviewRecords: [newRecord, ...state.reviewRecords],
             slices: updatedSlices,
+            sessionPlans: updatedSessionPlans,
             showReviewForm: false,
             sessionStartTime: null,
             reviewDraft: null,
-            sliceRehearsalData: []
+            sliceRehearsalData: [],
+            activeSessionPlanId: null
           };
         });
         get().runQualityCheck();
@@ -387,6 +412,151 @@ export const useSliceStore = create<AppState & AppActions>()(
 
       setSessionStartTime: (time) => {
         set({ sessionStartTime: time });
+      },
+
+      setShowSessionPlanPanel: (show) => {
+        set({ showSessionPlanPanel: show });
+      },
+
+      setShowSessionPlanForm: (show) => {
+        set({ showSessionPlanForm: show });
+      },
+
+      setEditingSessionPlanId: (id) => {
+        set({ editingSessionPlanId: id });
+      },
+
+      setViewingSessionPlanId: (id) => {
+        set({ viewingSessionPlanId: id });
+      },
+
+      setActiveSessionPlanId: (id) => {
+        set({ activeSessionPlanId: id });
+      },
+
+      addSessionPlan: (planData) => {
+        const now = new Date().toISOString();
+        const newPlan: SessionPlan = {
+          ...planData,
+          id: generateId(),
+          createdAt: now,
+          updatedAt: now,
+          rehearsalCount: 0
+        };
+        set((state) => ({
+          sessionPlans: [...state.sessionPlans, newPlan]
+        }));
+      },
+
+      updateSessionPlan: (id, updates) => {
+        set((state) => ({
+          sessionPlans: state.sessionPlans.map((plan) =>
+            plan.id === id
+              ? { ...plan, ...updates, updatedAt: new Date().toISOString() }
+              : plan
+          )
+        }));
+      },
+
+      deleteSessionPlan: (id) => {
+        set((state) => ({
+          sessionPlans: state.sessionPlans.filter((plan) => plan.id !== id),
+          viewingSessionPlanId: state.viewingSessionPlanId === id ? null : state.viewingSessionPlanId,
+          activeSessionPlanId: state.activeSessionPlanId === id ? null : state.activeSessionPlanId
+        }));
+      },
+
+      getSessionPlan: (id) => {
+        return get().sessionPlans.find((p) => p.id === id);
+      },
+
+      getSessionPlanDuration: (planId) => {
+        const plan = get().sessionPlans.find((p) => p.id === planId);
+        if (!plan) return 0;
+        const { slices } = get();
+        const activeSliceIds = plan.slices
+          .filter((s) => !s.isExcluded)
+          .map((s) => s.sliceId);
+        return slices
+          .filter((s) => activeSliceIds.includes(s.id))
+          .reduce((sum, s) => sum + s.durationMinutes, 0);
+      },
+
+      getSessionPlanDurationRisk: (planId) => {
+        const plan = get().sessionPlans.find((p) => p.id === planId);
+        if (!plan) return { level: 'normal' as const, diffMinutes: 0, percent: 0 };
+        
+        const actualDuration = get().getSessionPlanDuration(planId);
+        const targetDuration = plan.targetDurationMinutes;
+        const diffMinutes = actualDuration - targetDuration;
+        const percent = targetDuration > 0 ? (diffMinutes / targetDuration) * 100 : 0;
+
+        let level: 'normal' | 'warning' | 'danger' = 'normal';
+        if (diffMinutes > 0) {
+          if (percent >= 20) {
+            level = 'danger';
+          } else if (percent >= 10) {
+            level = 'warning';
+          }
+        } else if (diffMinutes < 0 && Math.abs(percent) >= 30) {
+          level = 'warning';
+        }
+
+        return { level, diffMinutes, percent };
+      },
+
+      getSessionPlanActiveSlices: (planId) => {
+        const plan = get().sessionPlans.find((p) => p.id === planId);
+        if (!plan) return [];
+        const { slices } = get();
+        const activeSlices = plan.slices
+          .filter((s) => !s.isExcluded)
+          .sort((a, b) => a.orderIndex - b.orderIndex)
+          .map((s) => slices.find((slice) => slice.id === s.sliceId))
+          .filter((s): s is ExhibitionSlice => s !== undefined);
+        return activeSlices;
+      },
+
+      getSessionPlanReviews: (planId) => {
+        const { reviewRecords } = get();
+        return reviewRecords
+          .filter((r) => r.sessionPlanId === planId)
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      },
+
+      getSessionPlanLatestReview: (planId) => {
+        const reviews = get().getSessionPlanReviews(planId);
+        return reviews[0];
+      },
+
+      startRehearsalWithPlan: (planId) => {
+        const plan = get().sessionPlans.find((p) => p.id === planId);
+        if (!plan) return;
+
+        const activeSlices = get().getSessionPlanActiveSlices(planId);
+        if (activeSlices.length === 0) return;
+
+        set({
+          isRehearsalMode: true,
+          currentRehearsalIndex: 0,
+          activeSessionPlanId: planId,
+          sessionStartTime: new Date().toISOString(),
+          sliceRehearsalData: activeSlices.map((s) => ({
+            sliceId: s.id,
+            elapsedSeconds: 0,
+            isCompleted: false
+          }))
+        });
+      },
+
+      exportSessionPlanChecklist: (planId) => {
+        const plan = get().sessionPlans.find((p) => p.id === planId);
+        const { slices, reviewRecords } = get();
+        if (!plan) return;
+
+        const content = exportSessionPlanToMarkdown(plan, slices, reviewRecords);
+        const filename = `场次计划_${plan.name}_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.md`;
+        downloadFile(content, filename, 'text/markdown');
       }
     }),
     {
@@ -396,7 +566,8 @@ export const useSliceStore = create<AppState & AppActions>()(
         filters: state.filters,
         reviewRecords: state.reviewRecords,
         reviewDraft: state.reviewDraft,
-        sliceRehearsalData: state.sliceRehearsalData
+        sliceRehearsalData: state.sliceRehearsalData,
+        sessionPlans: state.sessionPlans
       })
     }
   )
