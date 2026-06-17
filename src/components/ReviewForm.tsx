@@ -33,15 +33,22 @@ export const ReviewForm = () => {
     setShowReviewForm,
     reviewDraft,
     saveReviewDraft,
-    clearReviewDraft
+    clearReviewDraft,
+    activeSessionPlanId,
+    setActiveSessionPlanId,
+    getSessionPlanActiveSlices
   } = useSliceStore();
 
-  const activeSlices = useMemo(() =>
-    slices
+  const sessionPlanId = reviewDraft?.sessionPlanId || activeSessionPlanId || undefined;
+
+  const activeSlices = useMemo(() => {
+    if (sessionPlanId) {
+      return getSessionPlanActiveSlices(sessionPlanId);
+    }
+    return slices
       .filter((s) => !s.isBackup && s.rehearsalStatus !== 'skipped')
-      .sort((a, b) => a.orderIndex - b.orderIndex),
-    [slices]
-  );
+      .sort((a, b) => a.orderIndex - b.orderIndex);
+  }, [slices, sessionPlanId, getSessionPlanActiveSlices]);
 
   const initialReviews = useMemo(() => {
     if (reviewDraft && Object.keys(reviewDraft.sliceReviews).length > 0) {
@@ -105,6 +112,7 @@ export const ReviewForm = () => {
     saveRehearsalReview({
       sessionStartTime: startTime,
       sessionEndTime,
+      sessionPlanId,
       totalActualDurationMinutes: totalActualDuration,
       overallNotes,
       sliceReviews: validReviews
@@ -115,6 +123,7 @@ export const ReviewForm = () => {
     saveReviewDraft({
       sessionStartTime: startTime,
       sessionEndTime,
+      sessionPlanId,
       sliceData: [],
       overallNotes,
       sliceReviews: sliceReviews as Record<string, Partial<SliceReview>>,
@@ -124,6 +133,7 @@ export const ReviewForm = () => {
 
   const handleSkip = () => {
     clearReviewDraft();
+    setActiveSessionPlanId(null);
     setShowReviewForm(false);
   };
 
@@ -133,8 +143,19 @@ export const ReviewForm = () => {
 
   const toggleRehearsed = (sliceId: string) => {
     const current = sliceReviews[sliceId];
-    const newStatus: RehearsalStep = current.rehearsalStatus === 'rehearsed' ? 'unrehearsed' : 'rehearsed';
-    updateSliceReview(sliceId, { rehearsalStatus: newStatus });
+    const slice = activeSlices.find((s) => s.id === sliceId);
+    if (!slice) return;
+    const newStatus: RehearsalStep = current?.rehearsalStatus === 'rehearsed' ? 'unrehearsed' : 'rehearsed';
+    updateSliceReview(sliceId, {
+      sliceId,
+      actualDurationMinutes: current?.actualDurationMinutes ?? slice.durationMinutes,
+      isStuck: current?.isStuck ?? false,
+      stuckDescription: current?.stuckDescription ?? '',
+      liveNotes: current?.liveNotes ?? '',
+      selfRating: (current?.selfRating ?? 3) as SelfRating,
+      improvementSuggestion: current?.improvementSuggestion ?? '',
+      rehearsalStatus: newStatus
+    });
   };
 
   const RatingStars = ({ sliceId, value }: { sliceId: string; value: SelfRating }) => (

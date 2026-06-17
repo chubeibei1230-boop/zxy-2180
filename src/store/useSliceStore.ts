@@ -498,7 +498,7 @@ export const useSliceStore = create<AppState & AppActions>()(
           } else if (percent >= 10) {
             level = 'warning';
           }
-        } else if (diffMinutes < 0 && Math.abs(percent) >= 30) {
+        } else if (diffMinutes < 0) {
           level = 'warning';
         }
 

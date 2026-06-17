@@ -31,6 +31,11 @@ import { useSliceStore } from '../store/useSliceStore';
 import { formatDuration } from '../utils/timeUtils';
 import { ExhibitionSlice, SessionPlanSlice, DurationRiskLevel } from '../types';
 
+const toDateTimeLocalValue = (date: Date) => {
+  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return offsetDate.toISOString().slice(0, 16);
+};
+
 interface SessionPlanFormProps {
   onClose: () => void;
 }
@@ -121,11 +126,11 @@ export const SessionPlanForm = ({ onClose }: SessionPlanFormProps) => {
   const [scheduledStartTime, setScheduledStartTime] = useState(() => {
     if (editingPlan?.scheduledStartTime) {
       const date = new Date(editingPlan.scheduledStartTime);
-      return date.toISOString().slice(0, 16);
+      return toDateTimeLocalValue(date);
     }
     const now = new Date();
     now.setHours(now.getHours() + 1);
-    return now.toISOString().slice(0, 16);
+    return toDateTimeLocalValue(now);
   });
 
   const [planSlices, setPlanSlices] = useState<SessionPlanSlice[]>(() => {
@@ -186,7 +191,7 @@ export const SessionPlanForm = ({ onClose }: SessionPlanFormProps) => {
       } else if (percent >= 10) {
         level = 'warning';
       }
-    } else if (diffMinutes < 0 && Math.abs(percent) >= 30) {
+    } else if (diffMinutes < 0) {
       level = 'warning';
     }
 

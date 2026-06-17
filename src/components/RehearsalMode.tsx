@@ -132,8 +132,14 @@ export const RehearsalMode = () => {
   };
 
   const handleExit = (option: 'review' | 'draft' | 'discard') => {
+    let finalSliceData = sliceRehearsalData;
     if (currentSlice) {
       const elapsed = timerRef.current?.getElapsedSeconds() || currentElapsedSeconds;
+      finalSliceData = sliceRehearsalData.map((data) =>
+        data.sliceId === currentSlice.id
+          ? { ...data, elapsedSeconds: elapsed, isCompleted: true }
+          : data
+      );
       updateSliceElapsed(currentSlice.id, elapsed, true);
     }
 
@@ -141,7 +147,7 @@ export const RehearsalMode = () => {
       const sessionEndTime = new Date().toISOString();
       const sliceReviews: Record<string, Partial<SliceReview & { rehearsalStatus: RehearsalStep }>> = {};
 
-      sliceRehearsalData.forEach((data) => {
+      finalSliceData.forEach((data) => {
         if (data.isCompleted || data.elapsedSeconds > 0) {
           const slice = slices.find((s) => s.id === data.sliceId);
           if (slice) {
@@ -162,7 +168,8 @@ export const RehearsalMode = () => {
       saveReviewDraft({
         sessionStartTime: sessionStartTime || new Date().toISOString(),
         sessionEndTime,
-        sliceData: [...sliceRehearsalData],
+        sessionPlanId: activeSessionPlanId || undefined,
+        sliceData: finalSliceData,
         overallNotes: '',
         sliceReviews,
         lastEditedIndex: 0
@@ -174,7 +181,7 @@ export const RehearsalMode = () => {
       const sessionEndTime = new Date().toISOString();
       const sliceReviews: Record<string, Partial<SliceReview & { rehearsalStatus: RehearsalStep }>> = {};
 
-      sliceRehearsalData.forEach((data) => {
+      finalSliceData.forEach((data) => {
         if (data.isCompleted || data.elapsedSeconds > 0) {
           const slice = slices.find((s) => s.id === data.sliceId);
           if (slice) {
@@ -195,7 +202,8 @@ export const RehearsalMode = () => {
       saveReviewDraft({
         sessionStartTime: sessionStartTime || new Date().toISOString(),
         sessionEndTime,
-        sliceData: [...sliceRehearsalData],
+        sessionPlanId: activeSessionPlanId || undefined,
+        sliceData: finalSliceData,
         overallNotes: '',
         sliceReviews,
         lastEditedIndex: currentRehearsalIndex
@@ -433,8 +441,13 @@ export const RehearsalMode = () => {
         </div>
 
         <button
-          onClick={goToNext}
-          disabled={currentRehearsalIndex === activeSlices.length - 1}
+          onClick={() => {
+            if (currentRehearsalIndex === activeSlices.length - 1) {
+              handleExit('review');
+            } else {
+              goToNext();
+            }
+          }}
           className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center gap-2"
         >
           {currentRehearsalIndex === activeSlices.length - 1 ? '完成排练' : '下一个'}

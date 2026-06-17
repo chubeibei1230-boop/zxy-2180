@@ -55,6 +55,7 @@ export interface SliceRehearsalData {
 export interface ReviewDraft {
   sessionStartTime: string;
   sessionEndTime: string;
+  sessionPlanId?: string;
   sliceData: SliceRehearsalData[];
   overallNotes: string;
   sliceReviews: Record<string, Partial<SliceReview>>;
